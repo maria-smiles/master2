@@ -5,20 +5,25 @@ import os
 
 
 st.title('Language grade')
-st.text('Here you can find out if the movie suits your level of English.')
+st.markdown('Here you can find out if the movie suits your level of English.')
 
-st.header('1. Download files\n2. Push the button on the sidebar\n3. Read the answer\n')
 
-uploaded_files = st.file_uploader("Choose SRT file(s). Several are possible. ", accept_multiple_files=True)
+sideb = st.sidebar
+sideb.markdown('1. Download files here')
+
+uploaded_files = sideb.file_uploader("Choose SRT file(s). Several are possible. ", accept_multiple_files=True)
 for uploaded_file in uploaded_files:
     if uploaded_file is not None:
         #bytes_data = uploaded_file.read()
-        st.write("filename:", uploaded_file.name)
+        #.write("filename:", uploaded_file.name)
         with open(os.path.join("Dir",uploaded_file.name),"wb") as f: 
             f.write(uploaded_file.getbuffer())         
-        st.success("Saved File")
-   
-   
+    
+sideb.markdown('2. Push button below when files will be downloaded')
+submit = sideb.button("button below")   
+path = 'Dir' # Путь к папке, в которую будет загружаться клиентский файл субтитров  
+
+    
 def preproc_subs():
 
     # Подготовка входящего субтитра к векторизации
@@ -70,7 +75,7 @@ def preproc_subs():
         return Sr
           
 
-    path = 'Dir' # Путь к папке, в которую будет загружаться клиентский файл субтитров   
+    
 
     df = pd.DataFrame(columns = ['Movie', 'Srt'])
     # Данные на вход - файл субтитров
@@ -84,15 +89,17 @@ def preproc_subs():
     df['Srt'] = lemmatise_srt(df['Srt'], stop) 
 
     # Векторизация
+    import pickle
+    with open('pickle_dict.pkl', 'rb') as file: 
+        eng_vocabulary = pickle.load(file)
     from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
-
-    count = CountVectorizer()
+    
+    count = CountVectorizer(vocabulary=eng_vocabulary)
     bag = count.fit_transform(df['Srt'])
     tfidfconverter = TfidfTransformer(use_idf=True, norm='l2', smooth_idf=True)
 
     bag = tfidfconverter.fit_transform(bag).toarray() # преобразует текст в цифры
 
-    import pickle
     with open('pickle_model.pkl', 'rb') as file: 
         model = pickle.load(file)
         
@@ -100,15 +107,16 @@ def preproc_subs():
 
     predicted = model.predict(bag)
     df['Level_pred'] = pd.Series(predicted)
+    df = df.drop(columns=['Srt'])
     df.to_csv('answer.csv', index=False)
+    return df
 
-sideb = st.sidebar
-sideb.markdown('Push button below when files will be downloaded')
-submit = sideb.button("button below")
 
 if submit:
-    preproc_subs()
-    st.write("subs done")
+    df = preproc_subs()
+    st.markdown('3. Read the answer')
+    
+    st.dataframe(data=df)
     
 
 
